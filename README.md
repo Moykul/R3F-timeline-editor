@@ -16,15 +16,11 @@ This project is a animation timeline editor with Leva integration for React Thre
 
 ### 2. Leva Integration Bridge
 - Bidirectional sync between timeline keyframes and Leva parameter controls
-- 3-keyframe limit per parameter with intelligent overflow handling
-- Toggle checkboxes for enabling/disabling keyframe insertion per parameter
-- File operations for saving/loading timeline configurations
 
 ### 3. 3D React 3 Fiber Integration
 - Real-time parameter processing with effective value computation
-- Shader/material updates synchronized with timeline playback
 - Three.js scene integration with correct canvas/UI layering
-- Performance-optimized for smooth 60fps animation
+- Performance-optimized for smooth animation
 
 ---
 
