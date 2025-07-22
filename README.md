@@ -1,16 +1,16 @@
-# VFX Engine Timeline System
+# R3F Timeline Editor
 
 ## 🎯 Project Overview
 
-This project is a professional animation timeline system with Leva integration for VFX parameter control in React Three Fiber (R3F) applications. It enables real-time keyframe animation with bidirectional synchronization between a timeline and parameter controls, designed for modern VFX and 3D workflows.
+This project is a animation timeline editor with Leva integration for React Three Fiber (R3F) applications. It enables real-time keyframe animation with bidirectional synchronization between a timeline and parameter controls, designed for modern VFX and 3D workflows.
 
 ---
 
 ## 🚀 Features & Achievements
 
-### 1. Professional Timeline Interface
+### 1. Animation Timeline Interface
 - Draggable timeline container with Material Design-inspired styling
-- Toolbar and layout inspired by [animation-timeline-control demo](https://ievgennaida.github.io/animation-timeline-control/)
+- Toolbar and layout inspired by [animation-timeline-control demo](https://ievgennaida.github.io/animation-timeline-control/) created by Ievgen Naida (BIG THANKS!!!)
 - Keyframe management with visual feedback and interpolation
 - Real-time playback controls with frame-accurate scrubbing
 
@@ -20,7 +20,7 @@ This project is a professional animation timeline system with Leva integration f
 - Toggle checkboxes for enabling/disabling keyframe insertion per parameter
 - File operations for saving/loading timeline configurations
 
-### 3. VFX System Integration
+### 3. 3D React 3 Fiber Integration
 - Real-time parameter processing with effective value computation
 - Shader/material updates synchronized with timeline playback
 - Three.js scene integration with correct canvas/UI layering
