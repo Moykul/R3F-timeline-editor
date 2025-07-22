@@ -3,6 +3,7 @@
 ## 🎯 Project Overview
 
 This project is a animation timeline editor with Leva integration for React Three Fiber (R3F) applications. It enables real-time keyframe animation with bidirectional synchronization between a timeline and parameter controls, designed for modern VFX and 3D workflows.
+[**R3F Timeline Editor**](https://moykul.github.io/R3F-timeline-editor/)
 
 ---
 
