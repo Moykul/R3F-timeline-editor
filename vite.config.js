@@ -30,5 +30,6 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true
-  }
+  },
+  base: '/R3F-timeline-editor/'
 });
