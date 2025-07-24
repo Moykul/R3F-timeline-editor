@@ -20,6 +20,8 @@ const AnimationTimeline = React.forwardRef(({
   const [timeline, setTimeline] = useState(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLooping, setIsLooping] = useState(false);
+  const isLoopingRef = useRef(false);
   
   // FIX: Use ref to avoid stale closure in event handler
   const isPlayingRef = useRef(false);
@@ -40,8 +42,12 @@ const AnimationTimeline = React.forwardRef(({
   // FIX: Update ref whenever state changes
   useEffect(() => {
     isPlayingRef.current = isPlaying;
-      console.log('🔧 isPlaying state changed:', isPlaying);
+    // console.log('🔧 isPlaying state changed:', isPlaying);
   }, [isPlaying]);
+
+  useEffect(() => {
+    isLoopingRef.current = isLooping;
+  }, [isLooping]);
 
   // Initialize timeline using official pattern
   useEffect(() => {
@@ -235,33 +241,25 @@ const AnimationTimeline = React.forwardRef(({
     },
     isPlaying: () => isPlaying,
     isInitialized: () => isInitialized,
-    
     addKeyframe: (parameterName, value, time) => {
       if (!timeline || !isInitialized) {
         return false;
       }
-      
       try {
         const model = timeline.getModel();
         if (!model || !model.rows) {
           return false;
         }
-        
         const rowIndex = getRowIndexByName(parameterName);
-          
         if (rowIndex < 0 || !model.rows[rowIndex]) {
           console.warn(`Invalid row index ${rowIndex} for parameter ${parameterName}`);
           return false;
         }
-        
         const normalizedValue = normalizeValue(parameterName, value);
-        
         const row = model.rows[rowIndex];
         const keyframes = row.keyframes;
-        
         const EPSILON = 50;
         const existingIndex = keyframes.findIndex(kf => Math.abs(kf.val - time) < EPSILON);
-        
         if (existingIndex >= 0) {
           keyframes[existingIndex].data = { value: normalizedValue };
         } else {
@@ -270,21 +268,44 @@ const AnimationTimeline = React.forwardRef(({
             selected: false,
             data: { value: normalizedValue }
           });
-          
           keyframes.sort((a, b) => a.val - b.val);
         }
-        
         timeline.setModel(model);
-        
         setTimeout(() => {
           if (timeline.redraw) {
             timeline.redraw();
           }
         }, 50);
-        
         return true;
       } catch (error) {
         console.error('Keyframe creation failed:', error);
+        return false;
+      }
+    },
+    deleteKeyframe: (parameterName, time) => {
+      if (!timeline || !isInitialized) return false;
+      try {
+        const model = timeline.getModel();
+        if (!model || !model.rows) return false;
+        const rowIndex = getRowIndexByName(parameterName);
+        if (rowIndex < 0 || !model.rows[rowIndex]) return false;
+        const row = model.rows[rowIndex];
+        const keyframes = row.keyframes;
+        if (!keyframes.length) return false;
+        // Find nearest keyframe within EPSILON
+        const EPSILON = 50;
+        const idx = keyframes.findIndex(kf => Math.abs(kf.val - time) < EPSILON);
+        if (idx >= 0) {
+          keyframes.splice(idx, 1);
+          timeline.setModel(model);
+          setTimeout(() => {
+            if (timeline.redraw) timeline.redraw();
+          }, 50);
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('Keyframe deletion failed:', error);
         return false;
       }
     }
@@ -293,58 +314,53 @@ const AnimationTimeline = React.forwardRef(({
   // FIX: Updated play function with proper state management
   const play = useCallback(() => {
     if (!timeline || !isInitialized || isPlaying) return;
-    
     if (playbackRef.current) {
       cancelAnimationFrame(playbackRef.current);
       playbackRef.current = null;
     }
-    
     let startTime = currentTime;
     if (currentTime >= duration - 100) {
       startTime = 0;
       timeline.setTime(0);
       setCurrentTime(0);
     }
-    
-    // console.log('🔧 Starting playback from time:', startTime);
-    
-    // FIX: Set state and ref together
     setIsPlaying(true);
     isPlayingRef.current = true;
     onPlaybackChange(true);
-    
     let performanceStartTime = null;
-  
     const animate = (timestamp) => {
       try {
         if (performanceStartTime === null) {
           performanceStartTime = timestamp;
         }
-        
         const elapsed = timestamp - performanceStartTime;
-        const newTime = Math.min(startTime + elapsed, duration);
-        
+        let newTime = Math.min(startTime + elapsed, duration);
         timeline.setTime(newTime);
         setCurrentTime(newTime);
-        
         if (newTime < duration) {
           playbackRef.current = requestAnimationFrame(animate);
         } else {
-          // console.log('🔧 Playback ended');
-          playbackRef.current = null;
-          setIsPlaying(false);
-          isPlayingRef.current = false;
-          onPlaybackChange(false);
+          if (isLoopingRef.current) {
+            // Restart from beginning
+            performanceStartTime = null;
+            startTime = 0;
+            timeline.setTime(0);
+            setCurrentTime(0);
+            playbackRef.current = requestAnimationFrame(animate);
+          } else {
+            playbackRef.current = null;
+            setIsPlaying(false);
+            isPlayingRef.current = false;
+            onPlaybackChange(false);
+          }
         }
       } catch (error) {
-        // console.log('🔧 Playback error:', error);
         playbackRef.current = null;
         setIsPlaying(false);
         isPlayingRef.current = false;
         onPlaybackChange(false);
       }
     };
-    
     playbackRef.current = requestAnimationFrame(animate);
   }, [timeline, isInitialized, isPlaying, currentTime, duration, onPlaybackChange]);
 
@@ -437,6 +453,7 @@ const AnimationTimeline = React.forwardRef(({
       )}
       
       <div className="timeline-toolbar">
+        
         <div 
           className="timeline-drag-handle"
           title="Drag to move timeline"
@@ -476,6 +493,7 @@ const AnimationTimeline = React.forwardRef(({
           ⏮
         </button>
         
+
         <button
           className="timeline-tool-button"
           title="Play timeline"
@@ -483,6 +501,22 @@ const AnimationTimeline = React.forwardRef(({
           disabled={isPlaying || !isInitialized}
         >
           ▶
+        </button>
+        <button
+          className="timeline-tool-button"
+          title="Pause timeline"
+          onClick={() => {
+            if (playbackRef.current) {
+              cancelAnimationFrame(playbackRef.current);
+              playbackRef.current = null;
+            }
+            setIsPlaying(false);
+            isPlayingRef.current = false;
+            onPlaybackChange(false);
+          }}
+          disabled={!isPlaying || !isInitialized}
+        >
+          ⏸
         </button>
         
         <button
@@ -510,6 +544,38 @@ const AnimationTimeline = React.forwardRef(({
           disabled={!isInitialized}
         >
           ⏭
+        </button>
+                <button
+          className={`timeline-tool-button${isLooping ? ' active' : ''}`}
+          title={isLooping ? 'Looping enabled' : 'Enable looping'}
+          onClick={() => setIsLooping(l => !l)}
+          disabled={!isInitialized}
+          style={{ fontSize: '18px', fontWeight: 700 }}
+        >
+          ⟳
+        </button>
+        <button
+          className="timeline-tool-button"
+          title="Delete keyframe at current time"
+          onClick={() => {
+            if (!timeline || !isInitialized) return;
+            // Try to delete keyframe for each parameter at current time
+            const parameters = ['positionX', 'positionY', 'positionZ'];
+            let deleted = false;
+            parameters.forEach(param => {
+              const res = ref && typeof ref !== 'function' && ref.current && ref.current.deleteKeyframe
+                ? ref.current.deleteKeyframe(param, currentTime)
+                : false;
+              if (res) deleted = true;
+            });
+            if (!deleted) {
+              // Optionally, show a message or visual feedback
+              // alert('No keyframe found at current time');
+            }
+          }}
+          disabled={!isInitialized}
+        >
+          X
         </button>
         
         <div className="timeline-spacer"></div>

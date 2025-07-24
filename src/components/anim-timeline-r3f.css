@@ -98,6 +98,7 @@
   fill: #cccccc;
 }
 
+
 .timeline-tool-button {
   display: flex;
   align-items: center;
@@ -112,8 +113,15 @@
   font-size: 18px;
   font-weight: bold;
   color: #cccccc;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
   line-height: 1;
+}
+
+.timeline-tool-button.active {
+  background: #404040;
+  color: #f4f686;
+  /* Optional: add a border or shadow for more emphasis */
+  /* border-bottom: 2px solid #f4f686; */
 }
 
 .timeline-tool-button:hover:not(:disabled) {
