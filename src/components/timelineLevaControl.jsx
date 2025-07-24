@@ -24,6 +24,17 @@ const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
   const handleLevaUpdate = useCallback((interpolated) => {
     if (!interpolated) return;
     isPlayingRef.current = interpolated.isPlaying || false;
+    // If timeline is driving, update Leva values directly for smooth scrubbing
+    const updates = {};
+    if (interpolated.positionX !== undefined) updates.pos_x = interpolated.positionX;
+    if (interpolated.positionY !== undefined) updates.pos_y = interpolated.positionY;
+    if (interpolated.positionZ !== undefined) updates.pos_z = interpolated.positionZ;
+    if (Object.keys(updates).length > 0) {
+      timelineDrivenRef.current = true;
+      set((prev) => ({ ...prev, ...updates }));
+      // Reset the flag after a frame
+      setTimeout(() => { timelineDrivenRef.current = false; }, 0);
+    }
     // Create timeline data with useTimelineLerp props
     const timelineData = {
       isPlaying: interpolated.isPlaying || false,
@@ -33,20 +44,13 @@ const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
       timelineDrivenRef: timelineDrivenRef,
       prevUserValuesRef: prevUserValuesRef
     };
-    // Map timeline parameters
-    if (interpolated.positionX !== undefined) timelineData.pos_x = interpolated.positionX;
-    if (interpolated.positionY !== undefined) timelineData.pos_y = interpolated.positionY;
-    if (interpolated.positionZ !== undefined) timelineData.pos_z = interpolated.positionZ;
-    // Send to Scene
+    if (updates.pos_x !== undefined) timelineData.pos_x = updates.pos_x;
+    if (updates.pos_y !== undefined) timelineData.pos_y = updates.pos_y;
+    if (updates.pos_z !== undefined) timelineData.pos_z = updates.pos_z;
     if (onTimelineData) {
       onTimelineData(timelineData);
     }
-    // Send to parent
     if (onUpdate) {
-      const updates = {};
-      if (interpolated.positionX !== undefined) updates.pos_x = interpolated.positionX;
-      if (interpolated.positionY !== undefined) updates.pos_y = interpolated.positionY;
-      if (interpolated.positionZ !== undefined) updates.pos_z = interpolated.positionZ;
       onUpdate(updates);
     }
   }, [set, onUpdate, onTimelineData, cubeValues]);

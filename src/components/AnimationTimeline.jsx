@@ -88,36 +88,19 @@ const AnimationTimeline = React.forwardRef(({
       
       setCurrentTime(time);
       onTimeChange(time);
-      
-      // FIX: Use ref instead of stale state
-      if (isPlayingRef.current) {
-        // console.log('🔧 Timeline is playing - checking for keyframes');
-        
-        const model = timelineInstance.getModel();
-        const hasKeyframes = model && model.rows && model.rows.some(row => row.keyframes.length > 0);
-        
-        // console.log('🔧 Has keyframes:', hasKeyframes);
-        
-        if (hasKeyframes) {
-          const interpolatedValues = interpolateValuesAtTime(time, model);
-          
-          // console.log('🔧 Interpolated values:', interpolatedValues);
-          
-          const timelineData = {
-            ...interpolatedValues,
-            isPlaying: isPlayingRef.current, // Use ref
-            currentTime: time,
-            timelineActive: true,
-            trigger: true
-          };
-          
-          // console.log('🔧 Calling onLevaUpdate');
-          onLevaUpdate(timelineData);
-        } else {
-          // console.log('🔧 No keyframes found - not calling onLevaUpdate');
-        }
-      } else {
-        // console.log('🔧 Timeline not playing - skipping onLevaUpdate');
+      // Always interpolate and send values for scrubbing
+      const model = timelineInstance.getModel();
+      const hasKeyframes = model && model.rows && model.rows.some(row => row.keyframes.length > 0);
+      if (hasKeyframes) {
+        const interpolatedValues = interpolateValuesAtTime(time, model);
+        const timelineData = {
+          ...interpolatedValues,
+          isPlaying: isPlayingRef.current, // Use ref
+          currentTime: time,
+          timelineActive: true,
+          trigger: true
+        };
+        onLevaUpdate(timelineData);
       }
     });
 
