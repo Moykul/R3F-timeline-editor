@@ -31,8 +31,7 @@ const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
     if (interpolated.positionZ !== undefined) updates.pos_z = interpolated.positionZ;
     if (Object.keys(updates).length > 0) {
       timelineDrivenRef.current = true;
-      set((prev) => ({ ...prev, ...updates }));
-      // Reset the flag after a frame
+      set(updates); // This updates the Leva UI as well
       setTimeout(() => { timelineDrivenRef.current = false; }, 0);
     }
     // Create timeline data with useTimelineLerp props
