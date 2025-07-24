@@ -2,14 +2,15 @@ import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useTimelineLerp } from './useTimelineLerp';
 
-const Scene = ({ 
+const Scene = ({
   cubePosition = { pos_x: 0, pos_y: 0, pos_z: 0 },
   timelineInterpolation = null,
   cubeValues = null,
   setCubeValues = null,
   isPlayingRef = null,
   timelineDrivenRef = null,
-  prevUserValuesRef = null
+  prevUserValuesRef = null,
+  isPlaying = true // default true for backward compatibility
 }) => {
   const meshRef = useRef();
   const targetRef = useRef({ x: 0, y: 0, z: 0 });
@@ -27,16 +28,14 @@ const Scene = ({
     timelineDrivenRef,
     prevUserValuesRef,
     interpolationSpeed: 8.0,
-    enabled: shouldUseTimelineLerp // Add enabled flag
+    enabled: shouldUseTimelineLerp && isPlaying // Only interpolate if playing
   });
 
-  // FIXED Scene.jsx - Only use Leva values
+  // Always update mesh position so timeline scrubbing updates the render even when paused
   useFrame(() => {
-    // ONLY use cubePosition (from Leva), ignore timeline completely
     currentRef.current.x = cubePosition.pos_x;
     currentRef.current.y = cubePosition.pos_y;
     currentRef.current.z = cubePosition.pos_z;
-    
     if (meshRef.current) {
       meshRef.current.position.set(
         currentRef.current.x,
