@@ -9,7 +9,10 @@ const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
     pos_z: { value: 0, min: -5, max: 5, step: 0.01 }
   }));
 
-  const [timelineVisible, setTimelineVisible] = useState(true);
+  // Add Leva toggle for timeline visibility
+  const [{ timelineVisible }, setTimelineVisible] = useControls('Timeline', () => ({
+    timelineVisible: { value: true, label: 'Show Timeline' }
+  }));
   const [currentTime, setCurrentTime] = useState(0);
   const timelineRef = useRef(null);
   const timelineDrivenRef = useRef(false);
@@ -84,17 +87,15 @@ const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
 
   return (
     <>
-      {timelineVisible && (
-        <AnimationTimeline
-          ref={timelineRef}
-          visible={timelineVisible}
-          duration={5000}
-          levaValues={cubeValues}
-          onLevaUpdate={handleLevaUpdate}
-          onTimeChange={setCurrentTime}
-          onPlaybackChange={handlePlaybackChange}
-        />
-      )}
+      <AnimationTimeline
+        ref={timelineRef}
+        visible={timelineVisible}
+        duration={5000}
+        levaValues={cubeValues}
+        onLevaUpdate={handleLevaUpdate}
+        onTimeChange={setCurrentTime}
+        onPlaybackChange={handlePlaybackChange}
+      />
     </>
   );
 };
