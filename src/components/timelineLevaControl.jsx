@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { useControls } from 'leva';
+import { useControls, button } from 'leva';
 import AnimationTimeline from './AnimationTimeline';
+import fileManager from './fileManager';
 
 const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
   const [cubeValues, set] = useControls('Cube Position', () => ({
@@ -9,9 +10,20 @@ const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
     pos_z: { value: 0, min: -5, max: 5, step: 0.01 }
   }));
 
-  // Add Leva toggle for timeline visibility
+  // Add Leva toggle for timeline visibility and custom export/import controls
+  const fileInputRef = useRef();
   const [{ timelineVisible }, setTimelineVisible] = useControls('Timeline', () => ({
-    timelineVisible: { value: true, label: 'Show Timeline' }
+    timelineVisible: { value: true, label: 'Show Timeline' },
+    exportAnimation: button(() => {
+      const timeline = timelineRef.current && timelineRef.current.getTimeline ? timelineRef.current.getTimeline() : null;
+      if (!timeline) return;
+      const model = timeline.getModel ? timeline.getModel() : null;
+      if (!model) return;
+      fileManager.saveJSON(model, 'animation-timeline.json');
+    }),
+    importAnimation: button(() => {
+      if (fileInputRef.current) fileInputRef.current.click();
+    })
   }));
   const [currentTime, setCurrentTime] = useState(0);
   const timelineRef = useRef(null);
@@ -85,8 +97,29 @@ const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
     }
   }, [cubeValues, currentTime]);
 
+
+  // Import animation from JSON (triggered by hidden file input)
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    fileManager.loadJSON(file, (model) => {
+      const timeline = timelineRef.current && timelineRef.current.getTimeline ? timelineRef.current.getTimeline() : null;
+      if (timeline && timeline.setModel) {
+        timeline.setModel(model);
+      }
+    });
+  };
+
   return (
     <>
+      {/* Hidden file input for import, triggered by Leva button */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json"
+        style={{ display: 'none' }}
+        onChange={handleImport}
+      />
       <AnimationTimeline
         ref={timelineRef}
         visible={timelineVisible}
