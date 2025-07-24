@@ -3,7 +3,7 @@ import { Timeline } from 'animation-timeline-js';
 
 /**
  * FIXED Animation Timeline Component
- * SOLUTION: Use ref for isPlaying to avoid stale closure in event handler
+ * SOLUTION: Keep timeline instance alive when UI is hidden
  */
 const AnimationTimeline = React.forwardRef(({ 
   visible = true,
@@ -42,16 +42,15 @@ const AnimationTimeline = React.forwardRef(({
   // FIX: Update ref whenever state changes
   useEffect(() => {
     isPlayingRef.current = isPlaying;
-    // console.log('🔧 isPlaying state changed:', isPlaying);
   }, [isPlaying]);
 
   useEffect(() => {
     isLoopingRef.current = isLooping;
   }, [isLooping]);
 
-  // Initialize timeline using official pattern
+  // FIXED: Initialize timeline regardless of visibility, but only create DOM when visible
   useEffect(() => {
-    if (!visible || !containerRef.current) return;
+    if (!containerRef.current) return;
     
     const timelineInstance = new Timeline({ id: containerRef.current });
     
@@ -81,11 +80,8 @@ const AnimationTimeline = React.forwardRef(({
     timelineInstance.setModel(initialModel);
     timelineInstance.setTime(0);
     
-    // FIX: Use ref instead of state in event handler
     timelineInstance.onTimeChanged((event) => {
       const time = event.val;
-      // console.log('🔧 TIMELINE TIME CHANGED:', time, 'isPlayingRef:', isPlayingRef.current);
-      
       setCurrentTime(time);
       onTimeChange(time);
       // Always interpolate and send values for scrubbing
@@ -95,7 +91,7 @@ const AnimationTimeline = React.forwardRef(({
         const interpolatedValues = interpolateValuesAtTime(time, model);
         const timelineData = {
           ...interpolatedValues,
-          isPlaying: isPlayingRef.current, // Use ref
+          isPlaying: isPlayingRef.current,
           currentTime: time,
           timelineActive: true,
           trigger: true
@@ -119,7 +115,7 @@ const AnimationTimeline = React.forwardRef(({
         timelineInstance.dispose();
       }
     };
-  }, [visible, duration]); // FIXED: Remove function dependencies that change every render
+  }, [duration]); // Only depend on duration, not visibility
 
   // Interpolate values at a specific time
   const interpolateValuesAtTime = useCallback((time, model) => {
@@ -275,7 +271,6 @@ const AnimationTimeline = React.forwardRef(({
         const row = model.rows[rowIndex];
         const keyframes = row.keyframes;
         if (!keyframes.length) return false;
-        // Find nearest keyframe within EPSILON
         const EPSILON = 50;
         const idx = keyframes.findIndex(kf => Math.abs(kf.val - time) < EPSILON);
         if (idx >= 0) {
@@ -294,7 +289,6 @@ const AnimationTimeline = React.forwardRef(({
     }
   }), [timeline, currentTime, isPlaying, isInitialized]);
 
-  // FIX: Updated play function with proper state management
   const play = useCallback(() => {
     if (!timeline || !isInitialized || isPlaying) return;
     if (playbackRef.current) {
@@ -324,7 +318,6 @@ const AnimationTimeline = React.forwardRef(({
           playbackRef.current = requestAnimationFrame(animate);
         } else {
           if (isLoopingRef.current) {
-            // Restart from beginning
             performanceStartTime = null;
             startTime = 0;
             timeline.setTime(0);
@@ -425,10 +418,14 @@ const AnimationTimeline = React.forwardRef(({
     }
   }, [isDragging, handleDragMove, handleDragEnd]);
 
-  if (!visible) return null;
-
+  // FIXED: Always render container, but hide it with CSS when not visible
   return (
-    <div className={`timeline-container ${className}`}>
+    <div 
+      className={`timeline-container ${className}`}
+      style={{ 
+        display: visible ? 'flex' : 'none' // Hide with CSS instead of not rendering
+      }}
+    >
       {!isInitialized && (
         <div style={{ padding: '10px', color: '#888', fontSize: '12px' }}>
           Initializing timeline...
@@ -542,7 +539,6 @@ const AnimationTimeline = React.forwardRef(({
           title="Delete keyframe at current time"
           onClick={() => {
             if (!timeline || !isInitialized) return;
-            // Try to delete keyframe for each parameter at current time
             const parameters = ['positionX', 'positionY', 'positionZ'];
             let deleted = false;
             parameters.forEach(param => {
@@ -551,10 +547,6 @@ const AnimationTimeline = React.forwardRef(({
                 : false;
               if (res) deleted = true;
             });
-            if (!deleted) {
-              // Optionally, show a message or visual feedback
-              // alert('No keyframe found at current time');
-            }
           }}
           disabled={!isInitialized}
         >
