@@ -1,10 +1,8 @@
+// AnimationTimeline.jsx - UPDATED for dynamic track generation
+
 import React, { useState, useRef, useEffect, useImperativeHandle, useCallback, useMemo } from 'react';
 import { Timeline } from 'animation-timeline-js';
 
-/**
- * FIXED Animation Timeline Component
- * SOLUTION: Keep timeline instance alive when UI is hidden
- */
 const AnimationTimeline = React.forwardRef(({ 
   visible = true,
   duration = 10000,
@@ -13,7 +11,11 @@ const AnimationTimeline = React.forwardRef(({
   onPlaybackChange = () => {},
   levaValues = {},
   onLevaUpdate = () => {},
-  className = ''
+  className = '',
+  // NEW: Dynamic configuration props
+  initialModel = null,
+  normalizeFunctions = null,
+  parameterMapping = null
 }, ref) => {
   const timelineRef = useRef(null);
   const containerRef = useRef(null);
@@ -22,10 +24,7 @@ const AnimationTimeline = React.forwardRef(({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
   const isLoopingRef = useRef(false);
-  
-  // FIX: Use ref to avoid stale closure in event handler
   const isPlayingRef = useRef(false);
-  
   const playbackRef = useRef(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -39,7 +38,7 @@ const AnimationTimeline = React.forwardRef(({
   const timeToFrame = (time) => Math.round((time / duration) * TOTAL_FRAMES);
   const frameToTime = (frame) => (frame / TOTAL_FRAMES) * duration;
 
-  // FIX: Update ref whenever state changes
+  // Update refs
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
@@ -48,13 +47,14 @@ const AnimationTimeline = React.forwardRef(({
     isLoopingRef.current = isLooping;
   }, [isLooping]);
 
-  // FIXED: Initialize timeline regardless of visibility, but only create DOM when visible
-  useEffect(() => {
-    if (!containerRef.current) return;
+  // UPDATED: Generate default model if none provided (fallback to old behavior)
+  const getInitialModel = useMemo(() => {
+    if (initialModel) {
+      return initialModel;
+    }
     
-    const timelineInstance = new Timeline({ id: containerRef.current });
-    
-    const initialModel = {
+    // Fallback to hardcoded model for backward compatibility
+    return {
       rows: [
         {
           name: 'positionX',
@@ -76,19 +76,70 @@ const AnimationTimeline = React.forwardRef(({
         }
       ]
     };
+  }, [initialModel]);
 
-    timelineInstance.setModel(initialModel);
+  // UPDATED: Dynamic normalize/denormalize functions
+  const denormalizeValue = useCallback((parameterName, normalizedValue) => {
+    if (normalizeFunctions && normalizeFunctions.denormalize[parameterName]) {
+      return normalizeFunctions.denormalize[parameterName](normalizedValue);
+    }
+    
+    // Fallback to hardcoded logic
+    switch (parameterName) {
+      case 'positionX':
+      case 'positionY':
+      case 'positionZ': 
+        return (normalizedValue * 10) - 5;
+      default: 
+        return normalizedValue;
+    }
+  }, [normalizeFunctions]);
+
+  const normalizeValue = useCallback((parameterName, value) => {
+    if (normalizeFunctions && normalizeFunctions.normalize[parameterName]) {
+      return normalizeFunctions.normalize[parameterName](value);
+    }
+    
+    // Fallback to hardcoded logic
+    switch (parameterName) {
+      case 'positionX':
+      case 'positionY':
+      case 'positionZ': 
+        return (value + 5) / 10;
+      default: 
+        return Math.max(0, Math.min(1, value));
+    }
+  }, [normalizeFunctions]);
+
+  // UPDATED: Dynamic row index lookup
+  const getRowIndexByName = useCallback((parameterName) => {
+    const model = getInitialModel;
+    if (!model || !model.rows) return -1;
+    
+    return model.rows.findIndex(row => row.name === parameterName);
+  }, [getInitialModel]);
+
+  // Initialize timeline with dynamic model
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const timelineInstance = new Timeline({ id: containerRef.current });
+    
+    // Use dynamic initial model
+    const model = getInitialModel;
+    timelineInstance.setModel(model);
     timelineInstance.setTime(0);
     
     timelineInstance.onTimeChanged((event) => {
       const time = event.val;
       setCurrentTime(time);
       onTimeChange(time);
-      // Always interpolate and send values for scrubbing
-      const model = timelineInstance.getModel();
-      const hasKeyframes = model && model.rows && model.rows.some(row => row.keyframes.length > 0);
+      
+      const currentModel = timelineInstance.getModel();
+      const hasKeyframes = currentModel && currentModel.rows && currentModel.rows.some(row => row.keyframes.length > 0);
+      
       if (hasKeyframes) {
-        const interpolatedValues = interpolateValuesAtTime(time, model);
+        const interpolatedValues = interpolateValuesAtTime(time, currentModel);
         const timelineData = {
           ...interpolatedValues,
           isPlaying: isPlayingRef.current,
@@ -115,9 +166,9 @@ const AnimationTimeline = React.forwardRef(({
         timelineInstance.dispose();
       }
     };
-  }, [duration]); // Only depend on duration, not visibility
+  }, [duration, getInitialModel]);
 
-  // Interpolate values at a specific time
+  // UPDATED: Dynamic interpolation with fallback
   const interpolateValuesAtTime = useCallback((time, model) => {
     const interpolated = {};
     
@@ -167,35 +218,7 @@ const AnimationTimeline = React.forwardRef(({
     });
     
     return interpolated;
-  }, []);
-
-  // Helper functions for value conversion
-  const denormalizeValue = (parameterName, normalizedValue) => {
-    switch (parameterName) {
-      case 'positionX':
-      case 'positionY':
-      case 'positionZ': return (normalizedValue * 10) - 5;
-      default: return normalizedValue;
-    }
-  };
-
-  const normalizeValue = (parameterName, value) => {
-    switch (parameterName) {
-      case 'positionX':
-      case 'positionY':
-      case 'positionZ': return (value + 5) / 10;
-      default: return Math.max(0, Math.min(1, value));
-    }
-  };
-
-  const getRowIndexByName = (parameterName) => {
-    const nameMap = {
-      'positionX': 0,
-      'positionY': 1,
-      'positionZ': 2,
-    };
-    return nameMap[parameterName] !== undefined ? nameMap[parameterName] : -1;
-  };
+  }, [denormalizeValue]);
 
   // Expose timeline methods through ref
   useImperativeHandle(ref, () => ({
@@ -287,8 +310,11 @@ const AnimationTimeline = React.forwardRef(({
         return false;
       }
     }
-  }), [timeline, currentTime, isPlaying, isInitialized]);
+  }), [timeline, currentTime, isPlaying, isInitialized, getRowIndexByName, normalizeValue]);
 
+  // Rest of the component remains the same (play, stop, drag functionality)...
+  // [Previous play, stop, drag code unchanged]
+  
   const play = useCallback(() => {
     if (!timeline || !isInitialized || isPlaying) return;
     if (playbackRef.current) {
@@ -360,7 +386,7 @@ const AnimationTimeline = React.forwardRef(({
     onPlaybackChange(false);
   }, [timeline, onPlaybackChange]);
 
-  // Drag functionality (keeping original)
+  // Drag handlers remain the same...
   const handleDragStart = useCallback((e) => {
     setIsDragging(true);
     const timelineContainer = e.currentTarget.closest('.timeline-container');
@@ -418,12 +444,23 @@ const AnimationTimeline = React.forwardRef(({
     }
   }, [isDragging, handleDragMove, handleDragEnd]);
 
-  // FIXED: Always render container, but hide it with CSS when not visible
+  // UPDATED: Dynamic track labels
+  const renderTrackLabels = () => {
+    const model = getInitialModel;
+    if (!model || !model.rows) return null;
+    
+    return model.rows.map((row, index) => (
+      <div key={row.name} className="timeline-track-label">
+        {row.displayName || row.name}
+      </div>
+    ));
+  };
+
   return (
     <div 
       className={`timeline-container ${className}`}
       style={{ 
-        display: visible ? 'flex' : 'none' // Hide with CSS instead of not rendering
+        display: visible ? 'flex' : 'none'
       }}
     >
       {!isInitialized && (
@@ -433,7 +470,6 @@ const AnimationTimeline = React.forwardRef(({
       )}
       
       <div className="timeline-toolbar">
-        
         <div 
           className="timeline-drag-handle"
           title="Drag to move timeline"
@@ -449,109 +485,63 @@ const AnimationTimeline = React.forwardRef(({
           </svg>
         </div>
         
-        <button
-          className="timeline-tool-button"
-          title="Go to start"
-          onClick={() => {
-            if (timeline && timeline.setTime && isInitialized) {
-              try {
-                if (playbackRef.current) {
-                  cancelAnimationFrame(playbackRef.current);
-                  playbackRef.current = null;
-                }
-                setIsPlaying(false);
-                isPlayingRef.current = false;
-                timeline.setTime(0);
-                setCurrentTime(0);
-              } catch (error) {
-                console.error('Error going to start:', error);
+        <button className="timeline-tool-button" title="Go to start" onClick={() => {
+          if (timeline && timeline.setTime && isInitialized) {
+            try {
+              if (playbackRef.current) {
+                cancelAnimationFrame(playbackRef.current);
+                playbackRef.current = null;
               }
+              setIsPlaying(false);
+              isPlayingRef.current = false;
+              timeline.setTime(0);
+              setCurrentTime(0);
+            } catch (error) {
+              console.error('Error going to start:', error);
             }
-          }}
-          disabled={!isInitialized}
-        >
-          ⏮
-        </button>
+          }
+        }} disabled={!isInitialized}>⏮</button>
         
-
-        <button
-          className="timeline-tool-button"
-          title="Play timeline"
-          onClick={play}
-          disabled={isPlaying || !isInitialized}
-        >
-          ▶
-        </button>
-        <button
-          className="timeline-tool-button"
-          title="Pause timeline"
-          onClick={() => {
-            if (playbackRef.current) {
-              cancelAnimationFrame(playbackRef.current);
-              playbackRef.current = null;
+        <button className="timeline-tool-button" title="Play timeline" onClick={play} disabled={isPlaying || !isInitialized}>▶</button>
+        
+        <button className="timeline-tool-button" title="Pause timeline" onClick={() => {
+          if (playbackRef.current) {
+            cancelAnimationFrame(playbackRef.current);
+            playbackRef.current = null;
+          }
+          setIsPlaying(false);
+          isPlayingRef.current = false;
+          onPlaybackChange(false);
+        }} disabled={!isPlaying || !isInitialized}>⏸</button>
+        
+        <button className="timeline-tool-button" title="Stop timeline" onClick={stop} disabled={!isInitialized}>⏹</button>
+        
+        <button className="timeline-tool-button" title="Go to end" onClick={() => {
+          if (timeline && timeline.setTime && isInitialized) {
+            try {
+              timeline.setTime(duration);
+              setCurrentTime(duration);
+            } catch (error) {
+              console.error('Error going to end:', error);
             }
-            setIsPlaying(false);
-            isPlayingRef.current = false;
-            onPlaybackChange(false);
-          }}
-          disabled={!isPlaying || !isInitialized}
-        >
-          ⏸
-        </button>
+          }
+        }} disabled={!isInitialized}>⏭</button>
         
-        <button
-          className="timeline-tool-button"
-          title="Stop timeline"
-          onClick={stop}
-          disabled={!isInitialized}
-        >
-          ⏹
-        </button>
+        <button className={`timeline-tool-button${isLooping ? ' active' : ''}`} title={isLooping ? 'Looping enabled' : 'Enable looping'} onClick={() => setIsLooping(l => !l)} disabled={!isInitialized} style={{ fontSize: '18px', fontWeight: 700 }}>⟳</button>
         
-        <button
-          className="timeline-tool-button"
-          title="Go to end"
-          onClick={() => {
-            if (timeline && timeline.setTime && isInitialized) {
-              try {
-                timeline.setTime(duration);
-                setCurrentTime(duration);
-              } catch (error) {
-                console.error('Error going to end:', error);
-              }
-            }
-          }}
-          disabled={!isInitialized}
-        >
-          ⏭
-        </button>
-                <button
-          className={`timeline-tool-button${isLooping ? ' active' : ''}`}
-          title={isLooping ? 'Looping enabled' : 'Enable looping'}
-          onClick={() => setIsLooping(l => !l)}
-          disabled={!isInitialized}
-          style={{ fontSize: '18px', fontWeight: 700 }}
-        >
-          ⟳
-        </button>
-        <button
-          className="timeline-tool-button"
-          title="Delete keyframe at current time"
-          onClick={() => {
-            if (!timeline || !isInitialized) return;
-            const parameters = ['positionX', 'positionY', 'positionZ'];
-            let deleted = false;
-            parameters.forEach(param => {
-              const res = ref && typeof ref !== 'function' && ref.current && ref.current.deleteKeyframe
-                ? ref.current.deleteKeyframe(param, currentTime)
-                : false;
-              if (res) deleted = true;
-            });
-          }}
-          disabled={!isInitialized}
-        >
-          X
-        </button>
+        <button className="timeline-tool-button" title="Delete keyframe at current time" onClick={() => {
+          if (!timeline || !isInitialized) return;
+          const model = getInitialModel;
+          if (!model || !model.rows) return;
+          
+          let deleted = false;
+          model.rows.forEach(row => {
+            const res = ref && typeof ref !== 'function' && ref.current && ref.current.deleteKeyframe
+              ? ref.current.deleteKeyframe(row.name, currentTime)
+              : false;
+            if (res) deleted = true;
+          });
+        }} disabled={!isInitialized}>X</button>
         
         <div className="timeline-spacer"></div>
         
@@ -566,9 +556,7 @@ const AnimationTimeline = React.forwardRef(({
 
       <div className="timeline-main">
         <div className="timeline-track-labels">
-          <div className="timeline-track-label">📍 Position X</div>
-          <div className="timeline-track-label">📍 Position Y</div>
-          <div className="timeline-track-label">📍 Position Z</div>
+          {renderTrackLabels()}
         </div>
         
         <div 

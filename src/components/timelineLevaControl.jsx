@@ -1,16 +1,181 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { useControls, button } from 'leva';
 import AnimationTimeline from './AnimationTimeline';
 import fileManager from './fileManager';
 
 const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
-  const [cubeValues, set] = useControls('Cube Position', () => ({
-    pos_x: { value: 0, min: -5, max: 5, step: 0.01 },
-    pos_y: { value: 0, min: -5, max: 5, step: 0.01 },
-    pos_z: { value: 0, min: -5, max: 5, step: 0.01 }
-  }));
+  // Enhanced parameter definitions with organized grouping
+  const parameterDefinitions = useMemo(() => ({
+    // Position parameters
+    pos_x: { 
+      value: 0, min: -5, max: 5, step: 0.01,
+      timelineName: 'positionX',
+      displayName: '📍 Position X',
+      color: '#3B82F6',
+      strokeColor: '#2563EB',
+      group: 'position'
+    },
+    pos_y: { 
+      value: 0, min: -5, max: 5, step: 0.01,
+      timelineName: 'positionY', 
+      displayName: '📍 Position Y',
+      color: '#10B981',
+      strokeColor: '#059669',
+      group: 'position'
+    },
+    pos_z: { 
+      value: 0, min: -5, max: 5, step: 0.01,
+      timelineName: 'positionZ',
+      displayName: '📍 Position Z', 
+      color: '#F59E0B',
+      strokeColor: '#D97706',
+      group: 'position'
+    },
 
-  // Add Leva toggle for timeline visibility and custom export/import controls
+    // Rotation parameters
+    rotation_x: {
+      value: 0, min: -180, max: 180, step: 1,
+      timelineName: 'rotationX',
+      displayName: '🔄 Rotation X',
+      color: '#EF4444',
+      strokeColor: '#DC2626',
+      group: 'rotation'
+    },
+    rotation_y: {
+      value: 0, min: -180, max: 180, step: 1,
+      timelineName: 'rotationY',
+      displayName: '🔄 Rotation Y',
+      color: '#F97316',
+      strokeColor: '#EA580C',
+      group: 'rotation'
+    },
+    rotation_z: {
+      value: 0, min: -180, max: 180, step: 1,
+      timelineName: 'rotationZ',
+      displayName: '🔄 Rotation Z',
+      color: '#84CC16',
+      strokeColor: '#65A30D',
+      group: 'rotation'
+    },
+
+    // Scale parameter
+    scale: {
+      value: 1, min: 0.1, max: 3, step: 0.01,
+      timelineName: 'scale',
+      displayName: '📏 Scale',
+      color: '#8B5CF6', 
+      strokeColor: '#7C3AED',
+      group: 'scale'
+    },
+
+    // Opacity parameter
+    opacity: {
+      value: 1, min: 0, max: 1, step: 0.01,
+      timelineName: 'opacity',
+      displayName: '👻 Opacity',
+      color: '#EC4899',
+      strokeColor: '#DB2777',
+      group: 'opacity'
+    }
+  }), []);
+
+  // Generate Leva controls from parameter definitions
+  const levaConfig = useMemo(() => {
+    const config = {};
+    Object.entries(parameterDefinitions).forEach(([key, def]) => {
+      config[key] = {
+        value: def.value,
+        min: def.min,
+        max: def.max,
+        step: def.step
+      };
+    });
+    return config;
+  }, [parameterDefinitions]);
+
+  const [cubeValues, set] = useControls('Cube Transform', () => levaConfig);
+
+  // Generate timeline model from parameter definitions
+  const timelineModel = useMemo(() => {
+    const rows = Object.entries(parameterDefinitions).map(([levaKey, def]) => ({
+      name: def.timelineName,
+      displayName: def.displayName,
+      keyframes: [],
+      style: { 
+        fillStyle: def.color, 
+        strokeStyle: def.strokeColor, 
+        height: 21 
+      },
+      _levaKey: levaKey,
+      _min: def.min,
+      _max: def.max,
+      _group: def.group
+    }));
+
+    return { rows };
+  }, [parameterDefinitions]);
+
+  // Create normalization functions
+  const createNormalizeFunctions = useMemo(() => {
+    const normalize = {};
+    const denormalize = {};
+    
+    Object.entries(parameterDefinitions).forEach(([levaKey, def]) => {
+      const timelineName = def.timelineName;
+      const range = def.max - def.min;
+      
+      normalize[timelineName] = (value) => {
+        return (value - def.min) / range;
+      };
+      
+      denormalize[timelineName] = (normalizedValue) => {
+        return def.min + (normalizedValue * range);
+      };
+    });
+    
+    return { normalize, denormalize };
+  }, [parameterDefinitions]);
+
+  // Create parameter mapping
+  const parameterMapping = useMemo(() => {
+    const timelineToLeva = {};
+    const levaToTimeline = {};
+    
+    Object.entries(parameterDefinitions).forEach(([levaKey, def]) => {
+      timelineToLeva[def.timelineName] = levaKey;
+      levaToTimeline[levaKey] = def.timelineName;
+    });
+    
+    return { timelineToLeva, levaToTimeline };
+  }, [parameterDefinitions]);
+
+  // Helper function to organize values by transform type
+  const organizeTransformValues = useCallback((values) => {
+    const organized = {
+      position: {},
+      rotation: {},
+      scale: {},
+      opacity: {}
+    };
+
+    Object.entries(values).forEach(([key, value]) => {
+      const def = parameterDefinitions[key];
+      if (def && def.group) {
+        if (def.group === 'position') {
+          organized.position[key] = value;
+        } else if (def.group === 'rotation') {
+          organized.rotation[key] = value;
+        } else if (def.group === 'scale') {
+          organized.scale[key] = value;
+        } else if (def.group === 'opacity') {
+          organized.opacity[key] = value;
+        }
+      }
+    });
+
+    return organized;
+  }, [parameterDefinitions]);
+
   const fileInputRef = useRef();
   const [{ timelineVisible }, setTimelineVisible] = useControls('Timeline', () => ({
     timelineVisible: { value: true, label: 'Show Timeline' },
@@ -25,80 +190,84 @@ const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
       if (fileInputRef.current) fileInputRef.current.click();
     })
   }));
+
   const [currentTime, setCurrentTime] = useState(0);
   const timelineRef = useRef(null);
   const timelineDrivenRef = useRef(false);
   const isPlayingRef = useRef(false);
-  const prevUserValuesRef = useRef({
-    pos_x: cubeValues.pos_x,
-    pos_y: cubeValues.pos_y,
-    pos_z: cubeValues.pos_z
-  });
+  const prevUserValuesRef = useRef({ ...cubeValues });
 
-  // MINIMAL TEST: Just log when timeline tries to update
+  // Handle timeline updates with organized data structure
   const handleLevaUpdate = useCallback((interpolated) => {
     if (!interpolated) return;
+    
     isPlayingRef.current = interpolated.isPlaying || false;
-    // If timeline is driving, update Leva values directly for smooth scrubbing
+    
+    // Convert timeline values to Leva updates
     const updates = {};
-    if (interpolated.positionX !== undefined) updates.pos_x = interpolated.positionX;
-    if (interpolated.positionY !== undefined) updates.pos_y = interpolated.positionY;
-    if (interpolated.positionZ !== undefined) updates.pos_z = interpolated.positionZ;
+    Object.entries(interpolated).forEach(([timelineName, value]) => {
+      if (value !== undefined && parameterMapping.timelineToLeva[timelineName]) {
+        const levaKey = parameterMapping.timelineToLeva[timelineName];
+        updates[levaKey] = value;
+      }
+    });
+    
     if (Object.keys(updates).length > 0) {
       timelineDrivenRef.current = true;
-      set(updates); // This updates the Leva UI as well
+      set(updates);
       setTimeout(() => { timelineDrivenRef.current = false; }, 0);
     }
-    // Create timeline data with useTimelineLerp props
+
+    // Organize current values by transform type
+    const organizedValues = organizeTransformValues({ ...cubeValues, ...updates });
+
+    // Create timeline data with organized structure
     const timelineData = {
       isPlaying: interpolated.isPlaying || false,
       cubeValues: cubeValues,
       setCubeValues: set,
       isPlayingRef: isPlayingRef,
       timelineDrivenRef: timelineDrivenRef,
-      prevUserValuesRef: prevUserValuesRef
+      prevUserValuesRef: prevUserValuesRef,
+      
+      // Organized transform data
+      cubePosition: organizedValues.position,
+      cubeRotation: organizedValues.rotation,
+      cubeScale: organizedValues.scale,
+      cubeOpacity: organizedValues.opacity
     };
-    if (updates.pos_x !== undefined) timelineData.pos_x = updates.pos_x;
-    if (updates.pos_y !== undefined) timelineData.pos_y = updates.pos_y;
-    if (updates.pos_z !== undefined) timelineData.pos_z = updates.pos_z;
-    if (onTimelineData) {
-      onTimelineData(timelineData);
-    }
-    if (onUpdate) {
-      onUpdate(updates);
-    }
-  }, [set, onUpdate, onTimelineData, cubeValues]);
+
+    if (onTimelineData) onTimelineData(timelineData);
+    if (onUpdate) onUpdate(updates);
+  }, [set, onUpdate, onTimelineData, cubeValues, parameterMapping, organizeTransformValues]);
 
   const handlePlaybackChange = useCallback((playing) => {
     isPlayingRef.current = playing;
   }, []);
 
-  // Simplified keyframe detection
+  // Dynamic keyframe detection
   React.useEffect(() => {
     if (timelineDrivenRef.current || isPlayingRef.current) return;
     
-    if (onUpdate) onUpdate(cubeValues);
+    // Organize values and send to parent
+    const organizedValues = organizeTransformValues(cubeValues);
+    if (onUpdate) onUpdate(organizedValues);
 
     const timeline = timelineRef.current;
     if (timeline && timeline.addKeyframe && timeline.isInitialized()) {
-      // Check for changes and add keyframes
-      if (Math.abs(cubeValues.pos_x - prevUserValuesRef.current.pos_x) > 0.001) {
-        timeline.addKeyframe('positionX', cubeValues.pos_x, currentTime);
-        prevUserValuesRef.current.pos_x = cubeValues.pos_x;
-      }
-      if (Math.abs(cubeValues.pos_y - prevUserValuesRef.current.pos_y) > 0.001) {
-        timeline.addKeyframe('positionY', cubeValues.pos_y, currentTime);
-        prevUserValuesRef.current.pos_y = cubeValues.pos_y;
-      }
-      if (Math.abs(cubeValues.pos_z - prevUserValuesRef.current.pos_z) > 0.001) {
-        timeline.addKeyframe('positionZ', cubeValues.pos_z, currentTime);
-        prevUserValuesRef.current.pos_z = cubeValues.pos_z;
-      }
+      // Check all parameters dynamically
+      Object.entries(parameterDefinitions).forEach(([levaKey, def]) => {
+        const currentValue = cubeValues[levaKey];
+        const prevValue = prevUserValuesRef.current[levaKey];
+        
+        if (Math.abs(currentValue - prevValue) > (def.step || 0.001)) {
+          timeline.addKeyframe(def.timelineName, currentValue, currentTime);
+          prevUserValuesRef.current[levaKey] = currentValue;
+        }
+      });
     }
-  }, [cubeValues, currentTime]);
+  }, [cubeValues, currentTime, parameterDefinitions, onUpdate, organizeTransformValues]);
 
-
-  // Import animation from JSON (triggered by hidden file input)
   const handleImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -112,7 +281,6 @@ const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
 
   return (
     <>
-      {/* Hidden file input for import, triggered by Leva button */}
       <input
         ref={fileInputRef}
         type="file"
@@ -128,6 +296,9 @@ const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
         onLevaUpdate={handleLevaUpdate}
         onTimeChange={setCurrentTime}
         onPlaybackChange={handlePlaybackChange}
+        initialModel={timelineModel}
+        normalizeFunctions={createNormalizeFunctions}
+        parameterMapping={parameterMapping}
       />
     </>
   );
