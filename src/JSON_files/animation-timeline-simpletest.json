@@ -1,0 +1,100 @@
+{
+  "rows": [
+    {
+      "name": "positionX",
+      "displayName": "📍 Position X",
+      "keyframes": [
+        {
+          "val": 0,
+          "selected": false,
+          "data": {
+            "value": 0.5
+          }
+        },
+        {
+          "val": 1000,
+          "selected": false,
+          "data": {
+            "value": 0.304
+          }
+        },
+        {
+          "val": 2000,
+          "selected": false,
+          "data": {
+            "value": 0.41966666666666663
+          }
+        },
+        {
+          "val": 4000,
+          "selected": false,
+          "data": {
+            "value": 0.651
+          }
+        },
+        {
+          "val": 5000,
+          "selected": false,
+          "data": {
+            "value": 0.5
+          }
+        }
+      ],
+      "style": {
+        "fillStyle": "#3B82F6",
+        "strokeStyle": "#2563EB",
+        "height": 21
+      }
+    },
+    {
+      "name": "positionY",
+      "displayName": "📍 Position Y",
+      "keyframes": [
+        {
+          "val": 0,
+          "selected": false,
+          "data": {
+            "value": 0.5
+          }
+        },
+        {
+          "val": 2000,
+          "selected": false,
+          "data": {
+            "value": 0.379
+          }
+        },
+        {
+          "val": 5000,
+          "selected": false,
+          "data": {
+            "value": 0.5
+          }
+        }
+      ],
+      "style": {
+        "fillStyle": "#10B981",
+        "strokeStyle": "#059669",
+        "height": 21
+      }
+    },
+    {
+      "name": "positionZ",
+      "displayName": "📍 Position Z",
+      "keyframes": [
+        {
+          "val": 0,
+          "selected": false,
+          "data": {
+            "value": 0.5
+          }
+        }
+      ],
+      "style": {
+        "fillStyle": "#F59E0B",
+        "strokeStyle": "#D97706",
+        "height": 21
+      }
+    }
+  ]
+}
