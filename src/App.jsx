@@ -6,14 +6,11 @@ import Scene from './components/Scene';
 import TimelineLevaControl from './components/timelineLevaControl';
 import './components/anim-timeline-r3f.css';
 
-// Debug flag - enable for troubleshooting
 const DEBUG = false;
 
-// Function to fix Three.js HTML elements
 function fixThreeJsHTML() {
   const style = document.createElement('style');
   style.textContent = `
-    /* Make Canvas appear below UI elements */
     canvas {
       position: fixed !important;
       top: 0 !important;
@@ -23,7 +20,6 @@ function fixThreeJsHTML() {
       z-index: 0 !important;
     }
     
-    /* Timeline overlay styling */
     .timeline-overlay {
       position: fixed !important;
       top: 20px !important;
@@ -37,7 +33,6 @@ function fixThreeJsHTML() {
       border: 1px solid rgba(75, 85, 99, 0.5) !important;
     }
     
-    /* Leva panel styling */
     .leva-c_leva__root {
       position: fixed !important;
       top: 20px !important;
@@ -58,69 +53,79 @@ function fixThreeJsHTML() {
 }
 
 const App = () => {
-  // Organized state for different transform types
+  // SIMPLIFIED: Single state object instead of nested structure
   const [cubeTransforms, setCubeTransforms] = useState({
-    position: { pos_x: 0, pos_y: 0, pos_z: 0 },
-    rotation: { rotation_x: 0, rotation_y: 0, rotation_z: 0 },
-    scale: { scale: 1 },
-    opacity: { opacity: 1 }
+    pos_x: 0, pos_y: 0, pos_z: 0,
+    rotation_x: 0, rotation_y: 0, rotation_z: 0,
+    scale: 1,
+    opacity: 1
   });
   
   const [timelineData, setTimelineData] = useState(null);
 
-  // Handle organized transform updates from TimelineLevaControl
+  // FIXED: Direct, simple update handler
   const handleCubeUpdate = useCallback((updateData) => {
+    // Handle both direct Leva updates and organized timeline updates
     setCubeTransforms(prev => {
-      const newTransforms = { ...prev };
-
-      // Handle organized updates (from timeline)
-      if (updateData.cubePosition) {
-        newTransforms.position = { ...prev.position, ...updateData.cubePosition };
-      }
-      if (updateData.cubeRotation) {
-        newTransforms.rotation = { ...prev.rotation, ...updateData.cubeRotation };
-      }
-      if (updateData.cubeScale) {
-        newTransforms.scale = { ...prev.scale, ...updateData.cubeScale };
-      }
-      if (updateData.cubeOpacity) {
-        newTransforms.opacity = { ...prev.opacity, ...updateData.cubeOpacity };
-      }
-
-      // Handle direct value updates (from Leva controls)
+      const newState = { ...prev };
+      
+      // Direct property updates (from Leva)
       Object.entries(updateData).forEach(([key, value]) => {
-        if (key.startsWith('pos_')) {
-          newTransforms.position[key] = value;
-        } else if (key.startsWith('rotation_')) {
-          newTransforms.rotation[key] = value;
-        } else if (key === 'scale') {
-          newTransforms.scale[key] = value;
-        } else if (key === 'opacity') {
-          newTransforms.opacity[key] = value;
+        if (typeof value === 'number' && !isNaN(value)) {
+          newState[key] = value;
         }
       });
+      
+      // Organized updates (from timeline)
+      if (updateData.cubePosition) {
+        Object.assign(newState, updateData.cubePosition);
+      }
+      if (updateData.cubeRotation) {
+        Object.assign(newState, updateData.cubeRotation);
+      }
+      if (updateData.cubeScale) {
+        Object.assign(newState, updateData.cubeScale);
+      }
+      if (updateData.cubeOpacity) {
+        Object.assign(newState, updateData.cubeOpacity);
+      }
 
-      return newTransforms;
+      return newState;
     });
   }, []);
 
-  // Handle timeline data from TimelineLevaControl
   const handleTimelineData = useCallback((data) => {
     setTimelineData(data);
-    
-    // If timeline data includes organized transforms, update them
-    if (data.cubePosition || data.cubeRotation || data.cubeScale || data.cubeOpacity) {
-      handleCubeUpdate(data);
-    }
+    // Also update transforms from timeline data
+    handleCubeUpdate(data);
   }, [handleCubeUpdate]);
 
   useEffect(() => {
     fixThreeJsHTML();
-    
     return () => {
       document.removeEventListener('visibilitychange', fixThreeJsHTML);
     };
   }, []);
+
+  // FIXED: Create organized props from flat state
+  const organizedProps = {
+    cubePosition: {
+      pos_x: cubeTransforms.pos_x,
+      pos_y: cubeTransforms.pos_y,
+      pos_z: cubeTransforms.pos_z
+    },
+    cubeRotation: {
+      rotation_x: cubeTransforms.rotation_x,
+      rotation_y: cubeTransforms.rotation_y,
+      rotation_z: cubeTransforms.rotation_z
+    },
+    cubeScale: {
+      scale: cubeTransforms.scale
+    },
+    cubeOpacity: {
+      opacity: cubeTransforms.opacity
+    }
+  };
 
   return (
     <>
@@ -129,7 +134,6 @@ const App = () => {
         onTimelineData={handleTimelineData}
       />
 
-      {/* 3D Canvas */}
       <Canvas
         shadows
         camera={{ 
@@ -154,37 +158,26 @@ const App = () => {
         }}
       >
         <Suspense fallback={null}>
-          {/* Enhanced Lighting Setup */}
           <ambientLight intensity={0.3} />
           <directionalLight 
             position={[10, 10, 5]} 
             intensity={1.2}
             castShadow
             shadow-mapSize={[2048, 2048]}
-            shadow-camera-near={0.1}
-            shadow-camera-far={50}
-            shadow-camera-left={-10}
-            shadow-camera-right={10}
-            shadow-camera-top={10}
-            shadow-camera-bottom={-10}
           />
           <pointLight position={[-10, -10, -5]} intensity={0.5} color="#4169E1" />
           <pointLight position={[10, -5, 10]} intensity={0.3} color="#FF6B6B" />
           
-          {/* Orbit Controls */}
           <OrbitControls 
             enablePan={true}
             enableZoom={true}
             enableRotate={true}
             minDistance={2}
             maxDistance={50}
-            autoRotate={false}
-            autoRotateSpeed={0.5}
             dampingFactor={0.1}
             enableDamping={true}
           />
           
-          {/* Professional Ground Grid */}
           <Grid 
             position={[0, -2, 0]}
             args={[20, 20]}
@@ -199,13 +192,11 @@ const App = () => {
             infiniteGrid={false}
           />
           
-          {/* Scene with ORGANIZED TRANSFORM PROPS */}
+          {/* FIXED: Pass organized props directly */}
           <Scene 
-            cubePosition={cubeTransforms.position}
-            cubeRotation={cubeTransforms.rotation}
-            cubeScale={cubeTransforms.scale}
-            cubeOpacity={cubeTransforms.opacity}
+            {...organizedProps}
             
+            // Timeline props
             timelineInterpolation={timelineData}
             cubeValues={timelineData?.cubeValues}
             setCubeValues={timelineData?.setCubeValues}
@@ -214,7 +205,6 @@ const App = () => {
             prevUserValuesRef={timelineData?.prevUserValuesRef}
           />
     
-          {/* Performance Stats (debug mode) */}
           {DEBUG && <Stats />}
         </Suspense>
       </Canvas>

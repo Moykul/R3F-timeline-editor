@@ -103,7 +103,7 @@ const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
       keyframes: [],
       style: { 
         fillStyle: def.color, 
-        strokeStyle: def.strokeColor, 
+        strokeColor: def.strokeColor, 
         height: 21 
       },
       _levaKey: levaKey,
@@ -149,33 +149,6 @@ const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
     return { timelineToLeva, levaToTimeline };
   }, [parameterDefinitions]);
 
-  // Helper function to organize values by transform type
-  const organizeTransformValues = useCallback((values) => {
-    const organized = {
-      position: {},
-      rotation: {},
-      scale: {},
-      opacity: {}
-    };
-
-    Object.entries(values).forEach(([key, value]) => {
-      const def = parameterDefinitions[key];
-      if (def && def.group) {
-        if (def.group === 'position') {
-          organized.position[key] = value;
-        } else if (def.group === 'rotation') {
-          organized.rotation[key] = value;
-        } else if (def.group === 'scale') {
-          organized.scale[key] = value;
-        } else if (def.group === 'opacity') {
-          organized.opacity[key] = value;
-        }
-      }
-    });
-
-    return organized;
-  }, [parameterDefinitions]);
-
   const fileInputRef = useRef();
   const [{ timelineVisible }, setTimelineVisible] = useControls('Timeline', () => ({
     timelineVisible: { value: true, label: 'Show Timeline' },
@@ -218,41 +191,39 @@ const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
       setTimeout(() => { timelineDrivenRef.current = false; }, 0);
     }
 
-    // Organize current values by transform type
-    const organizedValues = organizeTransformValues({ ...cubeValues, ...updates });
-
-    // Create timeline data with organized structure
+    // Send updates to parent
+    if (onUpdate) onUpdate(updates);
+    
+    // Create timeline data for useTimelineLerp
     const timelineData = {
       isPlaying: interpolated.isPlaying || false,
       cubeValues: cubeValues,
       setCubeValues: set,
       isPlayingRef: isPlayingRef,
       timelineDrivenRef: timelineDrivenRef,
-      prevUserValuesRef: prevUserValuesRef,
-      
-      // Organized transform data
-      cubePosition: organizedValues.position,
-      cubeRotation: organizedValues.rotation,
-      cubeScale: organizedValues.scale,
-      cubeOpacity: organizedValues.opacity
+      prevUserValuesRef: prevUserValuesRef
     };
 
     if (onTimelineData) onTimelineData(timelineData);
-    if (onUpdate) onUpdate(updates);
-  }, [set, onUpdate, onTimelineData, cubeValues, parameterMapping, organizeTransformValues]);
+  }, [set, onUpdate, onTimelineData, cubeValues, parameterMapping]);
 
   const handlePlaybackChange = useCallback((playing) => {
     isPlayingRef.current = playing;
   }, []);
 
-  // Dynamic keyframe detection
+  // FIXED: Handle manual Leva control updates
   React.useEffect(() => {
+    // Skip if timeline is driving the changes
     if (timelineDrivenRef.current || isPlayingRef.current) return;
     
-    // Organize values and send to parent
-    const organizedValues = organizeTransformValues(cubeValues);
-    if (onUpdate) onUpdate(organizedValues);
+    console.log('🎮 Leva values changed:', cubeValues);
+    
+    // FIXED: Send direct values to parent (not organized)
+    if (onUpdate) {
+      onUpdate(cubeValues); // Send flat object directly
+    }
 
+    // Handle keyframe creation
     const timeline = timelineRef.current;
     if (timeline && timeline.addKeyframe && timeline.isInitialized()) {
       // Check all parameters dynamically
@@ -266,7 +237,7 @@ const TimelineLevaControl = ({ onUpdate, onTimelineData }) => {
         }
       });
     }
-  }, [cubeValues, currentTime, parameterDefinitions, onUpdate, organizeTransformValues]);
+  }, [cubeValues, currentTime, parameterDefinitions, onUpdate]);
 
   const handleImport = (e) => {
     const file = e.target.files[0];

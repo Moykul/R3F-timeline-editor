@@ -1,8 +1,8 @@
 import { useFrame } from '@react-three/fiber';
 
 /**
- * Custom hook for timeline interpolation using useFrame (to be used inside Canvas)
- * FIXED: Added enabled flag to conditionally run the interpolation
+ * FIXED Custom hook for timeline interpolation using useFrame
+ * Now properly avoids conflicts with manual Leva control updates
  */
 export function useTimelineLerp({
   isPlayingRef,
@@ -12,7 +12,7 @@ export function useTimelineLerp({
   timelineDrivenRef,
   prevUserValuesRef,
   interpolationSpeed = 8.0,
-  enabled = true // FIXED: Add enabled flag
+  enabled = true
 }) {
   // Simple lerp function
   const lerp = (start, end, t) => {
@@ -20,12 +20,22 @@ export function useTimelineLerp({
   };
 
   useFrame((_, delta) => {
-    // FIXED: Early return if not enabled or required props missing
-    if (!enabled || !isPlayingRef || !cubeValues || !setCubeValues || !targetValuesRef || !timelineDrivenRef || !prevUserValuesRef) {
+    // FIXED: More comprehensive early return conditions
+    if (!enabled || 
+        !isPlayingRef || 
+        !cubeValues || 
+        !setCubeValues || 
+        !targetValuesRef || 
+        !timelineDrivenRef || 
+        !prevUserValuesRef) {
       return;
     }
 
+    // FIXED: Only interpolate when actually playing timeline
     if (!isPlayingRef.current) return;
+    
+    // FIXED: Don't interfere when timeline is driving updates
+    if (timelineDrivenRef.current) return;
 
     const current = {
       pos_x: cubeValues.pos_x,
@@ -35,13 +45,20 @@ export function useTimelineLerp({
 
     const target = targetValuesRef.current;
 
-    // Check if we need to interpolate
+    // FIXED: More conservative interpolation check
+    const INTERPOLATION_THRESHOLD = 0.01; // Larger threshold to avoid micro-adjustments
     const needsInterpolation =
-      Math.abs(current.pos_x - target.pos_x) > 0.001 ||
-      Math.abs(current.pos_y - target.pos_y) > 0.001 ||
-      Math.abs(current.pos_z - target.pos_z) > 0.001;
+      Math.abs(current.pos_x - target.pos_x) > INTERPOLATION_THRESHOLD ||
+      Math.abs(current.pos_y - target.pos_y) > INTERPOLATION_THRESHOLD ||
+      Math.abs(current.pos_z - target.pos_z) > INTERPOLATION_THRESHOLD;
 
     if (needsInterpolation) {
+      // FIXED: Check if values are valid numbers
+      if (isNaN(target.pos_x) || isNaN(target.pos_y) || isNaN(target.pos_z)) {
+        console.warn('⚠️ Invalid target values in useTimelineLerp:', target);
+        return;
+      }
+
       // Smooth interpolation using lerp
       const next = {
         pos_x: lerp(current.pos_x, target.pos_x, delta * interpolationSpeed),
@@ -49,9 +66,16 @@ export function useTimelineLerp({
         pos_z: lerp(current.pos_z, target.pos_z, delta * interpolationSpeed)
       };
 
+      // FIXED: Validate interpolated values before applying
+      if (isNaN(next.pos_x) || isNaN(next.pos_y) || isNaN(next.pos_z)) {
+        console.warn('⚠️ Invalid interpolated values in useTimelineLerp:', next);
+        return;
+      }
+
       // Mark as timeline-driven update
       timelineDrivenRef.current = true;
 
+      // Apply the interpolated values
       setCubeValues(next);
 
       // Update our tracking references

@@ -3,7 +3,6 @@ import { useFrame } from '@react-three/fiber';
 import { useTimelineLerp } from './useTimelineLerp';
 
 const Scene = ({
-  // Separated transform props - much cleaner!
   cubePosition = { pos_x: 0, pos_y: 0, pos_z: 0 },
   cubeRotation = { rotation_x: 0, rotation_y: 0, rotation_z: 0 },
   cubeScale = { scale: 1 },
@@ -20,10 +19,12 @@ const Scene = ({
 }) => {
   const meshRef = useRef();
   const targetRef = useRef({ x: 0, y: 0, z: 0 });
-  const currentRef = useRef({ x: 0, y: 0, z: 0 });
 
   // Check if we have useTimelineLerp props
   const shouldUseTimelineLerp = cubeValues && setCubeValues && isPlayingRef && timelineDrivenRef && prevUserValuesRef;
+  
+  // Only use timeline lerp when actually playing AND timeline is driving
+  const canUseLerp = shouldUseTimelineLerp && isPlaying && isPlayingRef?.current;
   
   // Timeline lerp for smooth animation interpolation
   useTimelineLerp({
@@ -34,19 +35,37 @@ const Scene = ({
     timelineDrivenRef,
     prevUserValuesRef,
     interpolationSpeed: 8.0,
-    enabled: shouldUseTimelineLerp && isPlaying
+    enabled: canUseLerp
   });
 
-  // Apply all transforms to mesh
+  // Apply transforms with targeted debugging
   useFrame(() => {
     if (!meshRef.current) return;
 
-    // Apply position
-    meshRef.current.position.set(
-      cubePosition.pos_x || 0,
-      cubePosition.pos_y || 0,
-      cubePosition.pos_z || 0
-    );
+    // Get position values
+    const pos = {
+      x: cubePosition.pos_x || 0,
+      y: cubePosition.pos_y || 0,
+      z: cubePosition.pos_z || 0
+    };
+
+    // DEBUG: Only log when values look suspicious
+    const isOutOfBounds = Math.abs(pos.x) > 100 || Math.abs(pos.y) > 100 || Math.abs(pos.z) > 100;
+    const hasNaN = isNaN(pos.x) || isNaN(pos.y) || isNaN(pos.z);
+    
+    if (hasNaN || isOutOfBounds) {
+      console.warn('🚨 Suspicious cube position:', {
+        position: pos,
+        isPlaying: isPlayingRef?.current,
+        timelineDriven: timelineDrivenRef?.current,
+        propsReceived: cubePosition
+      });
+    }
+
+    // Apply position (with safety check)
+    if (!hasNaN) {
+      meshRef.current.position.set(pos.x, pos.y, pos.z);
+    }
     
     // Apply rotation (convert degrees to radians)
     meshRef.current.rotation.set(
@@ -66,10 +85,12 @@ const Scene = ({
       meshRef.current.material.transparent = opacityValue < 1;
     }
 
-    // Update current position for timeline lerp
-    currentRef.current.x = cubePosition.pos_x || 0;
-    currentRef.current.y = cubePosition.pos_y || 0;
-    currentRef.current.z = cubePosition.pos_z || 0;
+    // Update target for timeline lerp when needed
+    if (timelineDrivenRef?.current) {
+      targetRef.current.x = pos.x;
+      targetRef.current.y = pos.y;
+      targetRef.current.z = pos.z;
+    }
   });
 
   return (
@@ -79,7 +100,10 @@ const Scene = ({
         <boxGeometry args={[0.5, 0.5, 0.5]} />
         <meshStandardMaterial 
           color="#8B5CF6" 
-
+          metalness={0.1}
+          roughness={0.2}
+          emissive="#2D1B69"
+          emissiveIntensity={0.1}
         />
       </mesh>
       
@@ -88,7 +112,8 @@ const Scene = ({
         <sphereGeometry args={[0.3, 32, 32]} />
         <meshStandardMaterial 
           color="#10B981"
-
+          metalness={0.2}
+          roughness={0.3}
         />
       </mesh>
       
@@ -96,8 +121,19 @@ const Scene = ({
         <cylinderGeometry args={[0.3, 0.3, 1, 32]} />
         <meshStandardMaterial 
           color="#F59E0B"
-
+          metalness={0.3}
+          roughness={0.4}
         />
+      </mesh>
+
+      <mesh position={[0, 0, 2]} castShadow receiveShadow>
+        <coneGeometry args={[0.2, 0.8, 16]} />
+        <meshStandardMaterial color="#EF4444" />
+      </mesh>
+
+      <mesh position={[0, 0, -2]} castShadow receiveShadow>
+        <octahedronGeometry args={[0.25]} />
+        <meshStandardMaterial color="#3B82F6" />
       </mesh>
     </>
   );
